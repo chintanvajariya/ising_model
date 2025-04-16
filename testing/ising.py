@@ -7,7 +7,7 @@ lattice = np.random.randint(0, 2, size=(N, N)) * 2 - 1
 
 energies = np.zeros((trials))
 
-spin = [-1, 1]  # potential electron spins
+spin = [-1, 1]  # potential magnetic spins
 J = 2           # Interaction Strength: J > 0 means spins like to align, J < 0  means they prefer to be opposite
 h = 0.25        # External Field: h > 0 means bias towards spin up, h < 0 means bias towards spin down
 T = 2.5         # Temperature: high T means volatile spins, low T means stable spins (Boltzman normalized)
