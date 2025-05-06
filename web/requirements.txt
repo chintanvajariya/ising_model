@@ -1,0 +1,7 @@
+dash
+dash-mantine-components
+plotly
+numpy
+scipy
+numba
+gunicorn

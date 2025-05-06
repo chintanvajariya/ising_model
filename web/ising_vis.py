@@ -136,7 +136,6 @@ def compute_faction_labels(faction_map):
     return labels
 
 def create_faction_h_sliders(sim):
-    import dash_mantine_components as dmc
     sliders = []
 
     for i, h in enumerate(sim.h_values):
