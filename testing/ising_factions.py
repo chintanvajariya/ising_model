@@ -1,22 +1,24 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
+from matplotlib.widgets import Slider, Button
 from scipy.ndimage import convolve
 from numba import njit
 
-N = 20
+N = 25
 trials = 1000
 lattice = np.random.randint(0, 2, size=(N, N)) * 2 - 1
 
-energies = np.zeros((trials))
+energies = np.zeros((trials + 1))
 
 spin = [-1, 1]  # potential magnetic spins
 J = 2           # Interaction Strength: J > 0 means spins like to align, J < 0  means they prefer to be opposite
 h = 0.25        # External Field: h > 0 means bias towards spin up, h < 0 means bias towards spin down
 T = 2.5         # Temperature: high T means volatile spins, low T means stable spins (Boltzman normalized)
 
-J_intra = 2.0   # Interaction Strength between particles in the faction
-J_inter = 0.5   # Interaction Strength between particles of different factions
+J_intra = 2.5   # Interaction Strength between particles in the faction
+
+J_inter = 0.25   # Interaction Strength between particles of different factions
 
 def num_factions(N):
     return min(12, max(3, N // 5 + 2))
@@ -152,6 +154,20 @@ def flip_probability(row, col): # ∆E ≤ 0, lower energy, flip the spin
         return 1
     else:
         return np.exp(-delta / T)
+    
+def get_spin_percentages(faction_map, lattice):
+    faction_ids = np.unique(faction_map)
+    spin_percentages = []
+    for f in faction_ids:
+        mask = faction_map == f
+        total = np.sum(mask)
+        if total == 0:
+            spin_percentages.append(0)
+        else:
+            net_spin = np.sum(lattice[mask])
+            percent = round(100 * net_spin / total, 2)
+            spin_percentages.append(percent)
+    return spin_percentages
 
 
 # initialize plot layout
@@ -187,7 +203,6 @@ def init_plot(faction_map):
     ax_hist.set_ylabel("Net Spin", color='white')
 
     return fig, ax_lattice, ax_energy, ax_hist
-
 
 # update plot layout
 def update_plot(ax_lattice, ax_energy, ax_hist, faction_map, trial_num):
@@ -256,13 +271,6 @@ def update_plot(ax_lattice, ax_energy, ax_hist, faction_map, trial_num):
                 tint = patches.Rectangle((x, y), 1, 1, facecolor=color, edgecolor='none')
                 ax_lattice.add_patch(tint)
 
-
-    # thin gridlines
-    for row in range(N + 1):
-        ax_lattice.plot([0, N], [row, row], color='white', linewidth=0.5, alpha=0.2)
-    for col in range(N + 1):
-        ax_lattice.plot([col, col], [0, N], color='white', linewidth=0.5, alpha=0.2)
-
     # draw dim + and -
     for row in range(N):
         for col in range(N):
@@ -310,7 +318,7 @@ def update_plot(ax_lattice, ax_energy, ax_hist, faction_map, trial_num):
     spin_down = np.count_nonzero(lattice == -1)
     summary_text = f"↑ {spin_up}   ↓ {spin_down}"
 
-    ax_lattice.text(N // 2, N + 1.5, summary_text,
+    ax_lattice.text(N // 2.7, N + 2.1, summary_text,
                     ha='center', va='bottom', fontsize=11,
                     color='white', bbox=dict(facecolor='black', edgecolor='none', alpha=0.6))
 
@@ -346,6 +354,17 @@ def update_plot(ax_lattice, ax_energy, ax_hist, faction_map, trial_num):
 
     plt.pause(0.001)
 
+def slider_update(val):
+    selected_trial[0] = int(val)
+
+def on_submit(event):
+    idx = selected_trial[0]
+    if idx >= len(snapshots):
+        return
+    snapshot_lattice, energy_slice, spin_hist = snapshots[idx]
+    lattice[:, :] = snapshot_lattice
+    energies[:len(energy_slice)] = energy_slice
+    update_plot(ax_lattice, ax_energy, ax_hist, faction_map, idx * 10)
 
 
 V = generate_pattern(steps=3000)
@@ -353,8 +372,30 @@ faction_map = assign_factions()
 h_map = generate_h_map(faction_map)
 energies[0] = get_total_energy()
 
-plt.ion()
 fig, ax_lattice, ax_energy, ax_hist = init_plot(faction_map)
+
+slider_ax = fig.add_axes([0.13, 0.05, 0.255, 0.03], facecolor='lightgray')
+trial_slider = Slider(
+    ax=slider_ax,
+    label='Trial',
+    valmin=0,
+    valmax=trials // 10 - 1,
+    valinit=0,
+    valstep=1,
+    color='#f4a261'
+)
+
+button_ax = fig.add_axes([0.41, 0.045, 0.12, 0.075])
+submit_button = Button(button_ax, 'Submit', color='#91643f', hovercolor='#f4a261')
+
+submit_button.on_clicked(on_submit)
+
+trial_slider.set_active(False)  # deactivate initially
+trial_slider.label.set_text("Trial (Locked)")
+
+snapshots = []
+
+trial_slider.on_changed(slider_update)
 
 for i in range(trials):
     row, col = np.random.randint(0, N, size=2)
@@ -371,6 +412,12 @@ for i in range(trials):
 
     if i % 10 == 0:
         update_plot(ax_lattice, ax_energy, ax_hist, faction_map, i)
+        spin_hist = get_spin_percentages(faction_map, lattice)
+        snapshots.append((lattice.copy(), energies[:i+1].copy(), spin_hist))
 
-plt.ioff()
+selected_trial = [len(snapshots) - 1]
+trial_slider.set_val(len(snapshots) - 1)
+trial_slider.set_active(True)
+trial_slider.label.set_text("Trial")
+
 plt.show()

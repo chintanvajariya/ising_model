@@ -1,8 +1,8 @@
 import numpy as np
 import plotext as pltxt
 
-N = 20
-trials = 500
+N = 30
+trials = 5000
 lattice = np.random.randint(0, 2, size=(N, N)) * 2 - 1
 
 energies = np.zeros((trials))
@@ -10,7 +10,7 @@ energies = np.zeros((trials))
 spin = [-1, 1]  # potential magnetic spins
 J = 2           # Interaction Strength: J > 0 means spins like to align, J < 0  means they prefer to be opposite
 h = 0.25        # External Field: h > 0 means bias towards spin up, h < 0 means bias towards spin down
-T = 2.5         # Temperature: high T means volatile spins, low T means stable spins (Boltzman normalized)
+T = 0         # Temperature: high T means volatile spins, low T means stable spins (Boltzman normalized)
 
 def randomize():
     lattice = np.random.randint(0, 2, size=(N, N)) * 2 - 1
