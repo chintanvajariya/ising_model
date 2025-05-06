@@ -90,6 +90,7 @@ black = "rgb(18, 18, 18)"
 
 white = "rgb(229, 229, 229)"
 
+glow = False
 
 def compute_faction_borders(faction_map):
     N = faction_map.shape[0]
@@ -307,7 +308,6 @@ def toggle_inject_button(event_val):
 @app.callback(
     Output("injection-selector", "value"),
     Input("inject-button", "n_clicks"),
-    prevent_initial_call=True
 )
 
 def reset_dropdown_after_inject(n):
@@ -698,22 +698,48 @@ def update_graphs(store_data, timeline_idx, tab):
         number={'valueformat': ".2f"},
         gauge={
             'axis': {'range': [-1, 1], 'tickvals': [-1, -0.5, 0, 0.5, 1]},
-            'bar': {'color': f"rgba({blue}, {blue_layers[0]['opacity']})", 'thickness': blue_layers[0]["bar_thickness"]},
+            'bar': {
+                'color': f"rgba({blue}, {blue_layers[0]['opacity']})" if glow else "rgba(255, 255, 255, 1)",
+                'thickness': blue_layers[0]['bar_thickness'] if glow else 0.15
+            },
             'bgcolor': f"{black}",
             'steps': [
                 {'range': [-1, 0], 'color': color_maps[tab][1]},
                 {'range': [0, 1], 'color': color_maps[tab][0]}
             ],
             'threshold': {
-                'line': {'color': f"rgba({blue}, {blue_layers[0]['opacity']})", 'width': blue_layers[0]["line_width"]},
-                'thickness': blue_layers[0]["threshold_thickness"],
+                'line': {
+                    'color': f"rgba({blue}, {blue_layers[0]['opacity']})" if glow else "rgba(255, 255, 255, 1)",
+                    'width': blue_layers[0]['line_width'] if glow else 4.5
+                },
+                'thickness': blue_layers[0]['threshold_thickness'] if glow else 0.565,
                 'value': mag
             }
         }
     ))
 
-    for layer in blue_layers[1:]:
-        color = f"rgba({blue}, {layer['opacity']})"
+
+    if glow:
+        for layer in blue_layers[1:]:
+            color = f"rgba({blue}, {layer['opacity']})"
+            fig_gauge.add_trace(go.Indicator(
+                mode="gauge",
+                value=mag,
+                gauge={
+                    'axis': {'range': [-1, 1], 'visible': False},
+                    'bar': {'color': 'rgba(0,0,0,0)'},
+                    'bgcolor': 'rgba(0,0,0,0)',
+                    'steps': [],
+                    'bar': {'color': color, 'thickness': layer["bar_thickness"]},
+                    'threshold': {
+                        'line': {'color': color, 'width': layer["line_width"]},
+                        'thickness': layer["threshold_thickness"],
+                        'value': mag
+                    }
+                },
+                domain={'x': [0, 1], 'y': [0, 1]},
+            ))
+
         fig_gauge.add_trace(go.Indicator(
             mode="gauge",
             value=mag,
@@ -722,33 +748,15 @@ def update_graphs(store_data, timeline_idx, tab):
                 'bar': {'color': 'rgba(0,0,0,0)'},
                 'bgcolor': 'rgba(0,0,0,0)',
                 'steps': [],
-                'bar': {'color': color, 'thickness': layer["bar_thickness"]},
+                'bar': {'color': "rgba(255, 255, 255, 1)", 'thickness': 0.15},
                 'threshold': {
-                    'line': {'color': color, 'width': layer["line_width"]},
-                    'thickness': layer["threshold_thickness"],
+                    'line': {'color': "rgba(255, 255, 255, 1)", 'width': 4.5},
+                    'thickness': 0.565,
                     'value': mag
                 }
             },
             domain={'x': [0, 1], 'y': [0, 1]},
         ))
-
-    fig_gauge.add_trace(go.Indicator(
-        mode="gauge",
-        value=mag,
-        gauge={
-            'axis': {'range': [-1, 1], 'visible': False},
-            'bar': {'color': 'rgba(0,0,0,0)'},
-            'bgcolor': 'rgba(0,0,0,0)',
-            'steps': [],
-            'bar': {'color': "rgba(255, 255, 255, 1)", 'thickness': 0.15},
-            'threshold': {
-                'line': {'color': "rgba(255, 255, 255, 1)", 'width': 4.5},
-                'thickness': 0.565,
-                'value': mag
-            }
-        },
-        domain={'x': [0, 1], 'y': [0, 1]},
-    ))
 
 
 
@@ -792,18 +800,19 @@ def update_graphs(store_data, timeline_idx, tab):
         hoverinfo='skip'
     ))
 
-    for layer in glow_layers:
-        fig_agree.add_trace(go.Scatter(
-            x=[agreement_score],
-            y=[0.5],
-            mode="markers",
-            marker=dict(
-                color=f'rgba({blue}, {layer["opacity"]})',
-                size=layer["size"] + 11
-            ),
-            hoverinfo='skip',
-            showlegend=False
-        ))
+    if glow:
+        for layer in glow_layers:
+            fig_agree.add_trace(go.Scatter(
+                x=[agreement_score],
+                y=[0.5],
+                mode="markers",
+                marker=dict(
+                    color=f'rgba({blue}, {layer["opacity"]})',
+                    size=layer["size"] + 11
+                ),
+                hoverinfo='skip',
+                showlegend=False
+            ))
 
 
     fig_agree.add_trace(go.Scatter(
@@ -877,18 +886,19 @@ def update_graphs(store_data, timeline_idx, tab):
     borders_x = sd.get('borders_x', [])
     borders_y = sd.get('borders_y', [])
 
-    for layer in glow_layers:
-        fig_lattice.add_trace(go.Scatter(
-            x=borders_x,
-            y=borders_y,
-            mode='lines',
-            line=dict(
-                color=f'rgba({blue}, {layer["opacity"]})',
-                width=layer["size"]
-            ),
-            hoverinfo='skip',
-            showlegend=False
-        ))
+    if glow:
+        for layer in glow_layers:
+            fig_lattice.add_trace(go.Scatter(
+                x=borders_x,
+                y=borders_y,
+                mode='lines',
+                line=dict(
+                    color=f'rgba({blue}, {layer["opacity"]})',
+                    width=layer["size"]
+                ),
+                hoverinfo='skip',
+                showlegend=False
+            ))
 
     fig_lattice.add_trace(go.Scatter(
         x=borders_x,
@@ -942,17 +952,19 @@ def update_graphs(store_data, timeline_idx, tab):
 
     fig_energy = go.Figure()
 
-    for layer in glow_layers:
-        fig_energy.add_trace(go.Scatter(
-            y=energies,
-            mode='lines',
-            line=dict(
-                color=f'rgba({blue}, {layer["opacity"]})',
-                width=layer["size"]
-            ),
-            hoverinfo='skip',
-            showlegend=False
-        ))
+    if glow:
+
+        for layer in glow_layers:
+            fig_energy.add_trace(go.Scatter(
+                y=energies,
+                mode='lines',
+                line=dict(
+                    color=f'rgba({blue}, {layer["opacity"]})',
+                    width=layer["size"]
+                ),
+                hoverinfo='skip',
+                showlegend=False
+            ))
 
     fig_energy.add_trace(go.Scatter(
         y=energies,
