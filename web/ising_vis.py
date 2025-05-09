@@ -91,8 +91,6 @@ black = "rgb(18, 18, 18)"
 
 white = "rgb(229, 229, 229)"
 
-glow = False
-
 def compute_faction_borders(faction_map):
     N = faction_map.shape[0]
     x_points = []
@@ -192,11 +190,22 @@ app = dash.Dash(
 )
 server = app.server
 
+tab_style = {
+    'alignItems': 'top',
+    'justifyContent': 'center',
+    'fontSize': '17px',
+    'fontWeight': '500',
+    'textTransform': 'uppercase',
+    'letterSpacing': '1px',
+    'padding': '10px 0',
+    'flex': 1
+}
+
 app.layout = dmc.MantineProvider(
     theme={"colorScheme": "dark"},
     children=[
         html.Div(style={
-            'backgroundColor': '#121212',
+            'backgroundColor': f'{black}',
             'color': '#E5E5E5',
             'padding': '20px',
             'fontFamily': 'Inter, sans-serif',
@@ -206,13 +215,31 @@ app.layout = dmc.MantineProvider(
             '--subtext-color': '#c0c0c0'
         }, children=[
         # model selector tabs
-        dcc.Tabs(id='model-tabs', value='Ferromagnet',
-                children=[
-                dcc.Tab(label='Ferromagnet',  value='Ferromagnet'),
-                dcc.Tab(label='Election',      value='Election'),
-                dcc.Tab(label='Stock Market',  value='Stock Market')
-                ],
-                colors={"border":f"{white}","primary":"gold","background":f"{black}"}
+        dcc.Tabs(
+            id='model-tabs',
+            value='Ferromagnet',
+            children=[
+                dcc.Tab(label='Ferromagnet', value='Ferromagnet', style=tab_style, selected_style=tab_style),
+                dcc.Tab(label='Election', value='Election', style=tab_style, selected_style=tab_style),
+                dcc.Tab(label='Stock Market', value='Stock Market', style=tab_style, selected_style=tab_style),
+            ],
+            style={
+                'display': 'flex',
+                'width': '59%',
+                'margin': '0 auto',
+                'border': 'none',
+                'borderRadius': '12px',
+                'boxShadow': '0 2px 6px rgba(0, 0, 0, 0.4)',
+                'overflow': 'hidden',
+                'fontFamily': 'Inter, sans-serif',
+                'backgroundColor': f'{black}',
+                'height': '50px'
+            },
+            colors={
+                'border': 'rgba(0, 0, 0, 0)',
+                'primary': '#FFD700',
+                'background': f'{black}'
+            }
         ),
 
         # where per-model UI lives
@@ -222,7 +249,13 @@ app.layout = dmc.MantineProvider(
         dcc.Store(id='model-store', data=initial_store),
 
         # interval to trigger stepping
-        dcc.Interval(id='step-interval', interval=300, n_intervals=0)
+        dcc.Interval(id='step-interval', interval=250, n_intervals=0),
+
+        # store for glow state
+        dcc.Store(id='glow-store', data={'glow': True}),
+
+        # store for faction visibility
+        dcc.Store(id='faction-store', data={'show_factions': True}),
     ])
 ])
 
@@ -259,7 +292,7 @@ def update_play_pause_buttons(store_data, tab_value):
             'fontWeight': '600',
             'border': 'none',
             'color': 'white',
-            'boxShadow': 'none' if is_disabled else '0 0 12px rgba(255, 255, 255, 0.15)',
+            'boxShadow': '0 0 2px rgba(0,0,0,0.3)' if is_disabled else '0 0 12px rgba(255, 255, 255, 0.15)',
             'transition': 'all 0.3s ease-in-out',
             'cursor': 'not-allowed' if is_disabled else 'pointer',
             'opacity': 0.5 if is_disabled else 1
@@ -299,9 +332,16 @@ def toggle_inject_button(event_val):
         "fontWeight": "600",
         "cursor": "not-allowed" if disabled else "pointer",
         "opacity": 0.5 if disabled else 1,
-        "backgroundColor": "#3a3a3a" if disabled else None,
-        "color": "white" if disabled else None,
+        "backgroundColor": "#3a3a3a" if disabled else "linear-gradient(90deg, orange, red)",
+        "color": "white",
+        "transition": "box-shadow 0.3s ease-in-out",
+        "borderRadius": "8px"
     }
+
+    if not disabled:
+        style["boxShadow"] = "0 0 10px rgba(255, 94, 0, 0.7)"
+    else:
+        style["boxShadow"] = "0 0 10px rgba(0,0,0,0.3)"
 
     return disabled, style
 
@@ -313,14 +353,170 @@ def toggle_inject_button(event_val):
 def reset_dropdown_after_inject(n):
     return None  
 
+@app.callback(
+    Output('glow-store', 'data'),
+    Input('glow-toggle', 'checked')
+)
+def toggle_glow(checked):
+    return {'glow': checked}
+
+@app.callback(
+    Output('glow-toggle', 'style'),
+    Input('glow-toggle', 'checked')
+)
+def update_glow_switch_style(is_on):
+    base_style = {
+        'float': 'right',
+        'borderRadius': '20px',
+        'transition': 'box-shadow 0.3s ease-in-out'
+    }
+
+    if is_on:
+        base_style['boxShadow'] = '0 0 8px 4px rgba(0, 191, 255, 0.5)'
+
+    return base_style
+
+@app.callback(
+    Output('faction-store', 'data'),
+    Input('faction-toggle', 'checked')
+)
+def toggle_factions(checked):
+    return {'show_factions': checked}
+
+@app.callback(
+    Output('faction-toggle', 'style'),
+    Input('faction-toggle', 'checked'),
+    Input('glow-store', 'data')
+)
+def update_faction_toggle_style(is_on, glow_data):
+    glow = glow_data.get('glow', True)
+
+    style = {
+        'float': 'right',
+        'borderRadius': '20px',
+        'transition': 'box-shadow 0.3s ease-in-out'
+    }
+
+    if is_on and glow:
+        style['boxShadow'] = '0 0 10px rgba(0, 191, 255, 0.7)'
+
+    return style
+
+@app.callback(
+    Output('mini-initial-lattice', 'figure'),
+    Input('model-tabs', 'value'),
+    Input('glow-store', 'data'),
+    Input('faction-store', 'data'),
+    prevent_initial_call=True
+)
+def render_initial_lattice(tab, glow_data, faction_data):
+    glow = glow_data.get('glow', True)
+    show_factions = faction_data.get('show_factions', True)
+    data = initial_store[tab]
+    lattice = np.array(data['lattice'])
+    borders_x = data['borders_x']
+    borders_y = data['borders_y']
+    colors = color_maps[tab]
+
+    fig = px.imshow(lattice, color_continuous_scale=colors[::-1], origin='lower', zmax=1, zmin=-1)
+
+    fig.update_layout(
+        coloraxis_showscale=False,
+        paper_bgcolor=black,
+        plot_bgcolor=black,
+        margin=dict(l=0, r=0, t=0, b=0),
+        xaxis=dict(visible=False, showticklabels=False, showgrid=False),
+        yaxis=dict(visible=False, showticklabels=False, showgrid=False)
+    )
+
+    if show_factions:
+        if glow:
+            for layer in glow_layers:
+                fig.add_trace(go.Scatter(
+                    x=borders_x,
+                    y=borders_y,
+                    mode='lines',
+                    line=dict(color=f'rgba({blue}, {layer["opacity"]})', width=layer['size'] * 0.7),
+                    hoverinfo='skip',
+                    showlegend=False,
+                    cliponaxis=False
+                ))
+
+        fig.add_trace(go.Scatter(
+            x=borders_x,
+            y=borders_y,
+            mode='lines',
+            line=dict(color=white, width=1.5),
+            hoverinfo='skip',
+            showlegend=False,
+            cliponaxis=False
+        ))
+
+    else:
+        fig.add_trace(go.Scatter(
+            x=[-0.5, -0.5, lattice.shape[1] - 0.5, lattice.shape[1] - 0.5],
+            y=[-0.5, lattice.shape[0] - 0.5, -0.5, lattice.shape[0] - 0.5],
+            mode='lines',
+            line=dict(width=6, color='rgba(0, 0, 0, 0)'),
+            showlegend=False,
+            hoverinfo='skip'
+        ))
+
+
+    fig.update_traces(opacity=0.75)
+
+    return fig
+
+
 def generate_model_layout(model_name):
     store_constants = initial_store[model_name]['constants']
     return html.Div(children=[
         html.Div([
+
             html.Div([
                 html.Button('Play', id='play-button', n_clicks=0),
                 html.Button('Pause', id='pause-button', n_clicks=0),
-            ], style={'display': 'flex', 'justifyContent': 'space-between', 'marginBottom': '30px', 'marginTop': '10px'}),
+            ], style={'display': 'flex', 'justifyContent': 'space-between', 'marginTop': '5px'}),
+
+            html.Div([
+                html.Div([
+                    html.Span("Glow Effects Toggle", style={'fontSize': '16px'}),
+                    dmc.Switch(
+                        id='glow-toggle',
+                        checked=True,
+                        size='md',
+                        color=f'rgb({blue})'
+                    )
+                ], style={
+                    'backgroundColor': '#262626',
+                    'padding': '15px 25px 15px 15px',
+                    'borderRadius': '8px',
+                    'display': 'flex',
+                    'justifyContent': 'space-between',
+                    'alignItems': 'center',
+                    'boxShadow': '0 0 5px rgba(0,0,0,0.3)',
+                })
+            ], style={'marginTop': '10px'}),
+
+            html.Div([
+                html.Div([
+                    html.Span("Faction Lines Toggle", style={'fontSize': '16px'}),
+                    dmc.Switch(
+                        id='faction-toggle',
+                        checked=True,
+                        size='md',
+                        color=f'rgb({blue})'
+                    )
+                ], style={
+                    'backgroundColor': '#262626',
+                    'padding': '15px 25px 15px 12px',
+                    'borderRadius': '8px',
+                    'display': 'flex',
+                    'justifyContent': 'space-between',
+                    'alignItems': 'center',
+                    'boxShadow': '0 0 5px rgba(0,0,0,0.3)',
+                })
+            ], style={'marginTop': '10px', 'marginBottom': '30px'}),
 
             html.Div([
                 dcc.Dropdown(id='injection-selector',
@@ -346,7 +542,7 @@ def generate_model_layout(model_name):
                             style={
                                 'backgroundColor': f'{white}',
                                 'color': f'{black}',
-                                'padding': '-100px 8px -100px 12px',
+                                'padding': '0px 12px 0px 12px',
                                 'borderRadius': '5px 5px 5px 5px',
                             }
                         ),
@@ -360,7 +556,7 @@ def generate_model_layout(model_name):
                                     step=0.1,
                                     value=store_constants['J_intra'],
                                     marks=[{"value": i, "label": str(i)} for i in range(6)],
-                                    color="blue",
+                                    color=f"rgb({blue})",
                                     size="lg",
                                     style={
                                         'marginBottom': '25px',
@@ -377,7 +573,7 @@ def generate_model_layout(model_name):
                                     step=0.1,
                                     value=store_constants['J_inter'],
                                     marks=[{"value": i, "label": str(i)} for i in range(6)],
-                                    color="blue",
+                                    color=f"rgb({blue})",
                                     size="lg",
                                     style={
                                         'marginBottom': '25px',
@@ -394,7 +590,7 @@ def generate_model_layout(model_name):
                                     step=0.1,
                                     value=store_constants['T'],
                                     marks=[{"value": i, "label": str(i)} for i in range(1, 6)],
-                                    color="blue",
+                                    color=f"rgb({blue})",
                                     size="lg",
                                     style={
                                         'marginBottom': '10px',
@@ -419,8 +615,8 @@ def generate_model_layout(model_name):
                 multiple=True,
                 style={
                     'borderRadius': '5px',
-                    'marginBottom': '20px',
-                    'marginTop': '20px',
+                    'marginBottom': '10px',
+                    'marginTop': '30px',
                 }
             ),
 
@@ -432,13 +628,13 @@ def generate_model_layout(model_name):
                             style={
                                 'backgroundColor': f'{white}',
                                 'color': f'{black}',
-                                'padding': '0px 8px 0px 12px',
+                                'padding': '0px 12px 0px 12px',
                                 'borderRadius': '5px 5px 5px 5px',
                             }
                         ),
                         dmc.AccordionPanel([
                             html.Div([
-                                html.Span(f"Group {i+1} Bias (h)", title=f"How much group {i+1} favors +1 vs. -1"),
+                                html.Span(f"Group {i+1} Bias", title=f"How much group {i+1} favors +1 vs. -1"),
                                 dmc.Slider(
                                     id={'type': 'faction-h-slider', 'index': i},
                                     min=-1,
@@ -457,9 +653,7 @@ def generate_model_layout(model_name):
                             ]) for i in range(len(np.unique(state['faction_map'])))
                         ], style={
                             'backgroundColor': f'{black}',
-                            'padding': '8px 5px',
                             'color': f'{white}',
-                            'borderRadius': '0 0 5px 5px'
                         })
                     ], 
                     value="group-biases",
@@ -478,15 +672,16 @@ def generate_model_layout(model_name):
                     'fontSize': '14px'
                 }
             ),
-
-            html.Button('Save Snapshot', id='save-snapshot', n_clicks=0, style={'marginBottom': '20px'}),
-
-            html.Div("Timeline Scrubber", style={
-                'fontSize': '16px', 'fontWeight': '600', 'marginBottom': '5px'
-            }),
-            dcc.Slider(id='timeline-slider', min=0, max=0, step=1, value=0,
-                       tooltip={"placement": "bottom", "always_visible": True}),
-
+            dcc.Graph(
+                id='mini-initial-lattice',
+                config={'staticPlot': True},
+                style={
+                    'height': '265px',
+                    'width': '265px',
+                    'margin': '0 auto',
+                },
+                figure=create_blank_figure()
+            ),
         ], style={
             'width': '300px',
             'display': 'inline-block',
@@ -521,7 +716,6 @@ def generate_model_layout(model_name):
             'display': 'inline-block', 
             'verticalAlign': 'top',
             'marginLeft': '75px',
-            'marginTop': '6px',
             'marginRight': '0px',
             'marginBottom': '0px',
             })
@@ -544,7 +738,6 @@ def render_tab(tab):
         Input('J-inter-slider', 'value'),
         Input('T-slider', 'value'),
         Input('inject-button', 'n_clicks'),
-        Input('save-snapshot', 'n_clicks'),
         Input('play-button', 'n_clicks'),
         Input('pause-button', 'n_clicks'),
         Input({'type': 'faction-h-slider', 'index': ALL}, 'value'),
@@ -561,15 +754,12 @@ def update_model_store(tab,
                        J_inter,
                        T_val,
                        inject_clicks,
-                       save_clicks,
                        play_clicks,
                        pause_clicks,
                        faction_h_values,
                        inject_event,
                        store_data):
     ctx = callback_context.triggered[0]['prop_id'].split('.')[0]
-
-    print("Triggered interval")
 
     if ctx == 'model-tabs':
         for m in store_data:
@@ -631,16 +821,6 @@ def update_model_store(tab,
             'current_trial': state['current_trial'],
         })
         return store_data
-
-    if ctx == 'save-snapshot' and save_clicks>0:
-        sd = store_data[tab]
-        sd['snapshots'].append({
-            'lattice':       sd['lattice'],
-            'energies':      sd['energies'],
-            'trial':         sd['current_trial']
-        })
-        store_data[tab] = sd
-        return store_data
     
     if ctx == "{'type':'faction-h-slider','index':":
         sim = models[tab]
@@ -662,11 +842,12 @@ def update_model_store(tab,
     Output('energy-plot','figure'),
     Output('faction-plot','figure'),
     Input('model-store','data'),
-    Input('timeline-slider','value'),
+    Input('glow-store', 'data'),
+    Input('faction-store', 'data'),
     State('model-tabs','value'),
     prevent_initial_call=True
 )
-def update_graphs(store_data, timeline_idx, tab):
+def update_graphs(store_data, glow_data, faction_data, tab):
     sd = store_data[tab]
     lattice = np.array(sd['lattice'])
     energies = np.array(sd['energies'])
@@ -676,12 +857,8 @@ def update_graphs(store_data, timeline_idx, tab):
     colors = color_maps[tab]
     char_map = character_maps[tab]
     spin_title = spin_distribution_titles[tab]
-
-
-    if timeline_idx > 0 and timeline_idx <= len(sd['snapshots']):
-        snap = sd['snapshots'][timeline_idx-1]
-        lattice = np.array(snap['lattice'])
-        energies = snap['energies']
+    glow = glow_data.get('glow', True)
+    show_factions = faction_data.get('show_factions', True)
 
     mag = models[tab].get_magnetization()
 
@@ -771,13 +948,11 @@ def update_graphs(store_data, timeline_idx, tab):
     )
     
     agreement_score = models[tab].get_agreement_score()
-    # print(agreement_score)
-    adjust = (agreement_score * 2) - 1
+    agreement_score = (agreement_score * 2) - 1
 
     scale = 5
     adjusted = (np.log1p(scale * agreement_score) / np.log1p(scale))
     agreement_score = max(0, min(1, adjusted))
-    # print(agreement_score)
 
     fig_agree = go.Figure()
 
@@ -888,46 +1063,56 @@ def update_graphs(store_data, timeline_idx, tab):
     borders_x = sd.get('borders_x', [])
     borders_y = sd.get('borders_y', [])
 
-    if glow:
-        for layer in glow_layers:
-            fig_lattice.add_trace(go.Scatter(
-                x=borders_x,
-                y=borders_y,
-                mode='lines',
-                line=dict(
-                    color=f'rgba({blue}, {layer["opacity"]})',
-                    width=layer["size"]
-                ),
-                hoverinfo='skip',
-                showlegend=False
-            ))
+    if show_factions:
+        if glow:
+            for layer in glow_layers:
+                fig_lattice.add_trace(go.Scatter(
+                    x=borders_x,
+                    y=borders_y,
+                    mode='lines',
+                    line=dict(
+                        color=f'rgba({blue}, {layer["opacity"]})',
+                        width=layer["size"]
+                    ),
+                    hoverinfo='skip',
+                    showlegend=False
+                ))
 
-    fig_lattice.add_trace(go.Scatter(
-        x=borders_x,
-        y=borders_y,
-        mode='lines',
-        line=dict(color=f'{white}', width=2),
-        showlegend=False,
-        hoverinfo='skip'
-    ))
+        fig_lattice.add_trace(go.Scatter(
+            x=borders_x,
+            y=borders_y,
+            mode='lines',
+            line=dict(color=f'{white}', width=2),
+            showlegend=False,
+            hoverinfo='skip'
+        ))
 
-    labels = sd.get('labels', [])
-    for x, y, label_num in labels:
-        fig_lattice.add_shape(
-            type="circle",
-            xref="x", yref="y",
-            x0=x-0.7, y0=y-0.7, x1=x+0.7, y1=y+0.7,
-            line_color=f"{white}",
-            fillcolor=f"{black}",
-            opacity=0.5
-        )
-        fig_lattice.add_annotation(
-            x=x,
-            y=y,
-            text=str(label_num),
-            font=dict(color=f"{white}", size=12),
-            showarrow=False
-        )
+        labels = sd.get('labels', [])
+        for x, y, label_num in labels:
+            fig_lattice.add_shape(
+                type="circle",
+                xref="x", yref="y",
+                x0=x-0.7, y0=y-0.7, x1=x+0.7, y1=y+0.7,
+                line_color=f"{white}",
+                fillcolor=f"{black}",
+                opacity=0.5
+            )
+            fig_lattice.add_annotation(
+                x=x,
+                y=y,
+                text=str(label_num),
+                font=dict(color=f"{white}", size=12),
+                showarrow=False
+            )
+    else:
+        fig_lattice.add_trace(go.Scatter(
+            x=[-0.5, -0.5, lattice.shape[1] - 0.5, lattice.shape[1] - 0.5],
+            y=[-0.5, lattice.shape[0] - 0.5, -0.5, lattice.shape[0] - 0.5],
+            mode='lines',
+            line=dict(width=6, color='rgba(0, 0, 0, 0)'),
+            showlegend=False,
+            hoverinfo='skip'
+        ))
 
     text_x = []
     text_y = []
