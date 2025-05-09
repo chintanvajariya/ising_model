@@ -4,6 +4,7 @@ import dash_mantine_components as dmc
 import plotly.express as px
 import plotly.graph_objects as go
 import numpy as np
+import os
 
 from ising_sim import IsingSim
 
@@ -1029,4 +1030,5 @@ def update_graphs(store_data, timeline_idx, tab):
     return fig_gauge, fig_agree, fig_lattice, fig_energy, fig_distribution
 
 if __name__ == '__main__':
-    app.run(debug=False)
+    port = int(os.environ.get('PORT', 8080))
+    app.run(host='0.0.0.0', port=port, debug=False)
