@@ -186,7 +186,6 @@ for name, sim in models.items():
 
 app = dash.Dash(
     __name__, 
-    suppress_callback_exceptions=True,
     external_stylesheets=[
         'https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap'
     ]
@@ -569,6 +568,8 @@ def update_model_store(tab,
                        inject_event,
                        store_data):
     ctx = callback_context.triggered[0]['prop_id'].split('.')[0]
+
+    print("Triggered interval")
 
     if ctx == 'model-tabs':
         for m in store_data:
