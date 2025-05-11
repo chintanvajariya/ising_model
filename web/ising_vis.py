@@ -30,12 +30,13 @@ event_options = {
     'Ferromagnet': [
         {'label': 'Positive Electric Field', 'value': 'positive_field'},
         {'label': 'Negative Electric Field', 'value': 'negative_field'},
-        {'label': 'Magnetic Pulse',       'value': 'magnetic_pulse'}
+        {'label': 'Oscillating Field',       'value': 'oscillate_field'},
     ],
     'Election': [
-        {'label': 'Debate',            'value': 'debate'},
-        {'label': 'Scandal News',      'value': 'scandal'},
-        {'label': 'Policy Announcement','value': 'policy'}
+        {'label': 'Healthcare Expansion', 'value': 'pro_d'},
+        {'label': 'Tax Cut', 'value': 'pro_r'},
+        {'label': 'Climate Agreement Passed', 'value': 'con_r'},
+        {'label': 'Corporate Deregulation Passed', 'value': 'con_d'},
     ],
     'Stock Market': [
         {'label': 'Positive Earnings',   'value': 'positive_earnings'},
@@ -45,22 +46,36 @@ event_options = {
     ]
 }
 
+event_mapping = {
+    'positive_field': 0.3,
+    'negative_field': -0.3,
+    'oscillate_field': np.random.choice([0.3, -0.3]),
+    'pro_d': 0.5,
+    'pro_r': -0.5,
+    'con_r': 0.3,
+    'con_d': -0.3,
+    'positive_earnings': 0.3,
+    'negative_earnings': -0.3,
+    'rate_hike': 1.0,
+    'rate_cut': -1.0
+}
+
 spin_distribution_titles = {
-    'Ferromagnet': 'Distribution by Magnetic Domain',
-    'Election':    'Distribution by Demographic Group',
-    'Stock Market':'Distribution by Market Participant'
+    'Ferromagnet': '   Distribution by Magnetic Domain',
+    'Election':    '   Distribution by Demographic Group',
+    'Stock Market':'   Distribution by Market Participant'
 }
 
 gauge_titles = {
-    'Ferromagnet': "Magnetization",
-    'Election': "Partisan Tilt",
-    'Stock Market': "Market Sentiment"
+    'Ferromagnet': "Magnetization   ",
+    'Election': "Partisan Tilt   ",
+    'Stock Market': "Market Sentiment   "
 }
 
 agreement_titles = {
-    'Ferromagnet':      ("Local Magnetic Alignment", "Misaligned", "Alignment"),
-    'Election':         ("Local Voter Consensus",    "Polarized", "Consensus"),
-    'Stock Market':     ("Local Market Herding",     "Diverging",  "Herding")
+    'Ferromagnet':      ("Local Magnetic Alignment   ", "Misaligned", "Alignment"),
+    'Election':         ("Local Voter Consensus   ",    "Polarized", "Consensus"),
+    'Stock Market':     ("Local Market Herding   ",     "Diverging",  "Herding")
 }
 
 glow_layers = [
@@ -70,20 +85,6 @@ glow_layers = [
     {"size": 5,  "opacity": 0.4},
     {"size": 3,  "opacity": 0.65},
 ]
-
-event_mapping = {
-    'positive_field': 0.3,
-    'negative_field': -0.3,
-    'magnetic_pulse': 0.5,
-    'debate': 0.4,
-    'scandal': -0.4,
-    'policy': 0.2,
-    'positive_earnings': 0.3,
-    'negative_earnings': -0.3,
-    'rate_hike': 1.0,
-    'rate_cut': -1.0
-}
-
 
 blue = "0, 191, 255"
 
@@ -249,7 +250,7 @@ app.layout = dmc.MantineProvider(
         dcc.Store(id='model-store', data=initial_store),
 
         # interval to trigger stepping
-        dcc.Interval(id='step-interval', interval=250, n_intervals=0),
+        dcc.Interval(id='step-interval', interval=400, n_intervals=0),
 
         # store for glow state
         dcc.Store(id='glow-store', data={'glow': True}),
@@ -272,6 +273,36 @@ def create_blank_figure():
     )
     return fig
 
+def button_style(is_disabled=False, button_type='play'):
+    base_style = {
+        'textTransform': 'uppercase',
+        'letterSpacing': '1px',
+        'fontSize': '17px',
+        'width': '48%',
+        'padding': '12px',
+        'borderRadius': '10px',
+        'fontWeight': '600',
+        'border': 'none',
+        'color': 'white',
+        'boxShadow': '0 0 2px rgba(0,0,0,0.3)' if is_disabled else '0 0 12px rgba(255, 255, 255, 0.15)',
+        'transition': 'all 0.3s ease-in-out',
+        'cursor': 'not-allowed' if is_disabled else 'pointer',
+        'opacity': 0.5 if is_disabled else 1
+    }
+
+    if is_disabled:
+        base_style['backgroundColor'] = '#3a3a3a'
+        base_style['fontWeight'] = '500'
+    else:
+        if button_type == 'play':
+            base_style['backgroundImage'] = 'linear-gradient(90deg, rgb(0, 191, 255), #1266db)'
+            base_style['boxShadow'] = '0 0 12px rgba(0, 191, 255, 0.5)'
+        elif button_type == 'pause':
+            base_style['backgroundImage'] = 'linear-gradient(90deg, orange, red)'
+            base_style['boxShadow'] = '0 0 12px rgba(255, 94, 0, 0.5)'
+
+    return base_style
+
 @app.callback(
     Output('play-button', 'disabled'),
     Output('pause-button', 'disabled'),
@@ -280,36 +311,8 @@ def create_blank_figure():
     Input('model-store', 'data'),
     State('model-tabs', 'value')
 )
-
 def update_play_pause_buttons(store_data, tab_value):
     active = store_data[tab_value]['active']
-
-    def button_style(is_disabled, button_type):
-        base_style = {
-            'width': '48%',
-            'padding': '12px',
-            'borderRadius': '10px',
-            'fontWeight': '600',
-            'border': 'none',
-            'color': 'white',
-            'boxShadow': '0 0 2px rgba(0,0,0,0.3)' if is_disabled else '0 0 12px rgba(255, 255, 255, 0.15)',
-            'transition': 'all 0.3s ease-in-out',
-            'cursor': 'not-allowed' if is_disabled else 'pointer',
-            'opacity': 0.5 if is_disabled else 1
-        }
-
-        if is_disabled:
-            base_style['backgroundColor'] = '#3a3a3a'
-        else:
-            if button_type == 'play':
-                base_style['backgroundImage'] = 'linear-gradient(90deg, rgb(0, 191, 255), #1266db)'
-                base_style['boxShadow'] = '0 0 12px rgba(0, 191, 255, 0.5)'
-            elif button_type == 'pause':
-                base_style['backgroundImage'] = 'linear-gradient(90deg, orange, red)'
-                base_style['boxShadow'] = '0 0 12px rgba(255, 94, 0, 0.5)'
-
-        return base_style
-
 
     play_disabled = active
     pause_disabled = not active
@@ -319,6 +322,27 @@ def update_play_pause_buttons(store_data, tab_value):
 
     return play_disabled, pause_disabled, play_style, pause_style
 
+def inject_button_style(disabled=False):
+    style = {
+        "width": "100%",
+        "fontWeight": "600",
+        "cursor": "not-allowed" if disabled else "pointer",
+        "opacity": 0.5 if disabled else 1,
+        "color": "white",
+        "border": "none",
+        "padding": "6px",
+        "borderRadius": "8px",
+        "transition": "box-shadow 0.3s ease-in-out",
+        "backgroundColor": "#3a3a3a",
+        "boxShadow": "0 0 10px rgba(0,0,0,0.3)"
+    }
+
+    if not disabled:
+        style["backgroundImage"] = "linear-gradient(90deg, orange, red)"
+        style["boxShadow"] = "0 0 12px rgba(255, 94, 0, 0.5)"
+
+    return style
+
 @app.callback(
     Output("inject-button", "disabled"),
     Output("inject-button", "style"),
@@ -326,24 +350,7 @@ def update_play_pause_buttons(store_data, tab_value):
 )
 def toggle_inject_button(event_val):
     disabled = event_val is None
-
-    style = {
-        "width": "100%",
-        "fontWeight": "600",
-        "cursor": "not-allowed" if disabled else "pointer",
-        "opacity": 0.5 if disabled else 1,
-        "backgroundColor": "#3a3a3a" if disabled else "linear-gradient(90deg, orange, red)",
-        "color": "white",
-        "transition": "box-shadow 0.3s ease-in-out",
-        "borderRadius": "8px"
-    }
-
-    if not disabled:
-        style["boxShadow"] = "0 0 10px rgba(255, 94, 0, 0.7)"
-    else:
-        style["boxShadow"] = "0 0 10px rgba(0,0,0,0.3)"
-
-    return disabled, style
+    return disabled, inject_button_style(disabled)
 
 @app.callback(
     Output("injection-selector", "value"),
@@ -467,6 +474,30 @@ def render_initial_lattice(tab, glow_data, faction_data):
 
     return fig
 
+def graph_block(graph_id, title, figure, height="280px", width="100%"):
+    return html.Div([
+        html.Div(title, style={
+            'textTransform': 'uppercase',
+            'fontWeight': '500',
+            'letterSpacing': '1px',
+            'fontSize': '13px',
+            'color': 'white',
+            'marginBottom': '8px',
+            'fontFamily': 'Inter, sans-serif',
+            'textAlign': 'center'
+        }),
+        dcc.Graph(
+            id=graph_id,
+            figure=figure,
+            config={'displayModeBar': False},
+            style={
+                'height': height,
+                'width': width,
+                'margin': '0 auto'
+            }
+        )
+    ])
+
 
 def generate_model_layout(model_name):
     store_constants = initial_store[model_name]['constants']
@@ -474,13 +505,19 @@ def generate_model_layout(model_name):
         html.Div([
 
             html.Div([
-                html.Button('Play', id='play-button', n_clicks=0),
-                html.Button('Pause', id='pause-button', n_clicks=0),
-            ], style={'display': 'flex', 'justifyContent': 'space-between', 'marginTop': '5px'}),
+                html.Button('Play', id='play-button', n_clicks=0, style=button_style(True, 'play')),
+                html.Button('Pause', id='pause-button', n_clicks=0, style=button_style(False, 'pause')),
+            ], style={'display': 'flex', 'justifyContent': 'space-between', 'marginTop': '0px'}),
 
             html.Div([
                 html.Div([
-                    html.Span("Glow Effects Toggle", style={'fontSize': '16px'}),
+                    html.Span("Glow Effects", style={
+                        'fontSize': '17px',
+                        'textTransform': 'uppercase',
+                        'fontWeight': '500',
+                        'letterSpacing': '1px',
+                        'color': 'white',
+                        'fontFamily': 'Inter, sans-serif',}),
                     dmc.Switch(
                         id='glow-toggle',
                         checked=True,
@@ -489,7 +526,7 @@ def generate_model_layout(model_name):
                     )
                 ], style={
                     'backgroundColor': '#262626',
-                    'padding': '15px 25px 15px 15px',
+                    'padding': '15px 25px 15px 25px',
                     'borderRadius': '8px',
                     'display': 'flex',
                     'justifyContent': 'space-between',
@@ -500,7 +537,13 @@ def generate_model_layout(model_name):
 
             html.Div([
                 html.Div([
-                    html.Span("Faction Lines Toggle", style={'fontSize': '16px'}),
+                    html.Span("Faction Lines", style={
+                        'fontSize': '17px',
+                        'textTransform': 'uppercase',
+                        'fontWeight': '500',
+                        'letterSpacing': '1px',
+                        'color': 'white',
+                        'fontFamily': 'Inter, sans-serif',}),
                     dmc.Switch(
                         id='faction-toggle',
                         checked=True,
@@ -509,28 +552,27 @@ def generate_model_layout(model_name):
                     )
                 ], style={
                     'backgroundColor': '#262626',
-                    'padding': '15px 25px 15px 12px',
+                    'padding': '15px 25px 15px 25px',
                     'borderRadius': '8px',
                     'display': 'flex',
                     'justifyContent': 'space-between',
                     'alignItems': 'center',
                     'boxShadow': '0 0 5px rgba(0,0,0,0.3)',
                 })
-            ], style={'marginTop': '10px', 'marginBottom': '30px'}),
+            ], style={'marginTop': '10px', 'marginBottom': '25px'}),
 
             html.Div([
                 dcc.Dropdown(id='injection-selector',
                              options=event_options[model_name],
                              placeholder="Select External Event",
-                             style={'color': f'{black}', 'marginBottom': '10px', 'fontSize': '16px'},),
-                dmc.Button(
+                             style={'color': f'{black}', 'marginBottom': '10px', 'fontSize': '16px', 'zIndex': 1002, 'position': 'relative'},),
+                html.Button(
                     "Inject Event",
                     id="inject-button",
-                    variant="gradient",
-                    gradient={"from": "orange", "to": "red"},
                     disabled=True,
-                    size="sm",
-                )
+                    style=inject_button_style(disabled=True)
+                ),
+
 
             ]),
 
@@ -616,7 +658,7 @@ def generate_model_layout(model_name):
                 style={
                     'borderRadius': '5px',
                     'marginBottom': '10px',
-                    'marginTop': '30px',
+                    'marginTop': '25px',
                 }
             ),
 
@@ -668,7 +710,7 @@ def generate_model_layout(model_name):
                 multiple=True,
                 style={
                     'borderRadius': '5px',
-                    'marginBottom': '20px',
+                    'marginBottom': '28px',
                     'fontSize': '14px'
                 }
             ),
@@ -696,21 +738,76 @@ def generate_model_layout(model_name):
             html.Div([
                 dcc.Graph(id='lattice-plot', config={'staticPlot': True}, figure=create_blank_figure(),
                           style={'width': '400px', 'height': '400px', 'marginRight': '125px', 'marginLeft': '35px'}),
-
                 html.Div([
-                    dcc.Graph(id='magnetization-gauge', config={'staticPlot': True}, figure=create_blank_figure(),
-                              style={'width': '300px', 'height': '250px', 'marginBottom': '0px', 'marginTop': '20px'}),
-                    dcc.Graph(id='agree-bar', config={'staticPlot': True}, figure=create_blank_figure(),
-                              style={'width': '300px', 'height': '160px', 'marginRight': '20px'}),
-                ], style={'display': 'flex', 'flexDirection': 'column', 'alignItems': 'center', 'marginRight': '60px'}),
+                    html.Div([
+                        html.Div(gauge_titles[model_name], style={
+                            'textTransform': 'uppercase',
+                            'fontWeight': '500',
+                            'letterSpacing': '1px',
+                            'fontSize': '16px',
+                            'color': 'white',
+                            'width': '300px',
+                            'fontFamily': 'Inter, sans-serif',
+                            'textAlign': 'center'
+                        }),
+                        dcc.Graph(id='magnetization-gauge', config={'staticPlot': True}, figure=create_blank_figure(),
+                                style={'width': '300px', 'height': '250px'})
+                    ], style={'marginTop': '40px'}),
+
+                    html.Div([
+                        html.Div(agreement_titles[model_name][0], style={
+                            'textTransform': 'uppercase',
+                            'fontWeight': '500',
+                            'letterSpacing': '1px',
+                            'fontSize': '16px',
+                            'color': 'white',
+                            'marginBottom': '6px',
+                            'fontFamily': 'Inter, sans-serif',
+                            'textAlign': 'center'
+                        }),
+                        dcc.Graph(id='agree-bar', config={'staticPlot': True}, figure=create_blank_figure(),
+                                style={'width': '300px', 'height': '160px', 'marginRight': '20px', 'marginTop': '-40px'})
+                    ], style={'marginTop': '-40px',})
+                ], style={
+                    'display': 'flex',
+                    'flexDirection': 'column',
+                    'alignItems': 'center',
+                    'marginRight': '60px',
+                })
             ], style={'display': 'flex', 'justifyContent': 'center', 'alignItems': 'center'}),
 
             html.Div([
-                dcc.Graph(id='energy-plot', config={'staticPlot': True}, figure=create_blank_figure(),
-                          style={'display': 'inline-block', 'width': '48%', 'height': '280px', 'marginRight': '25px'}),
-                dcc.Graph(id='faction-plot', config={'staticPlot': True}, figure=create_blank_figure(),
-                          style={'display': 'inline-block', 'width': '48%', 'height': '280px'})
-            ], style={'marginTop': '20px'})
+                html.Div([
+                    html.Div("      Energy Over Time", style={
+                        'textTransform': 'uppercase',
+                        'fontWeight': '500',
+                        'letterSpacing': '1px',
+                        'fontSize': '16px',
+                        'color': 'white',
+                        'marginBottom': '-35px',
+                        'fontFamily': 'Inter, sans-serif',
+                        'textAlign': 'left',
+                    }),
+                    dcc.Graph(id='energy-plot', config={'staticPlot': True}, figure=create_blank_figure(),
+                            style={'display': 'inline-block', 'width': '100%', 'height': '280px'})
+                ], style={'display': 'inline-block', 'width': '48%', 'marginRight': '25px'}),
+
+                html.Div([
+                    html.Div(spin_distribution_titles[model_name], style={
+                        'textTransform': 'uppercase',
+                        'fontWeight': '500',
+                        'letterSpacing': '1px',
+                        'fontSize': '16px',
+                        'color': 'white',
+                        'marginBottom': '-35px',
+                        'fontFamily': 'Inter, sans-serif',
+                        'textAlign': 'left',
+                    }),
+                    dcc.Graph(id='faction-plot', config={'staticPlot': True}, figure=create_blank_figure(),
+                            style={'display': 'inline-block', 'width': '100%', 'height': '280px'})
+                ], style={'display': 'inline-block', 'width': '48%'})
+            ], style={'marginTop': '20px', 'display': 'flex', 'justifyContent': 'space-between'})
+
         ], style={
             'width': '70%', 
             'display': 'inline-block', 
@@ -811,8 +908,8 @@ def update_model_store(tab,
         return store_data
 
     if ctx == 'inject-button' and inject_clicks > 0 and inject_event:
-        value = event_mapping.get(inject_event, 0.0)
-        models[tab].inject_event(value=value)
+        value = event_mapping.get(inject_event)
+        models[tab].inject_event(value)
         
         state = models[tab].get_current_state()
         store_data[tab].update({
@@ -856,7 +953,6 @@ def update_graphs(store_data, glow_data, faction_data, tab):
 
     colors = color_maps[tab]
     char_map = character_maps[tab]
-    spin_title = spin_distribution_titles[tab]
     glow = glow_data.get('glow', True)
     show_factions = faction_data.get('show_factions', True)
 
@@ -873,7 +969,7 @@ def update_graphs(store_data, glow_data, faction_data, tab):
     fig_gauge = go.Figure(go.Indicator(
         mode="gauge+number",
         value=mag,
-        title={'text': gauge_titles[tab], 'font': {'color': f'{white}'}},
+        # title={'text': gauge_titles[tab], 'font': {'color': f'{white}'}},
         number={'valueformat': ".2f"},
         gauge={
             'axis': {'range': [-1, 1], 'tickvals': [-1, -0.5, 0, 0.5, 1]},
@@ -881,7 +977,7 @@ def update_graphs(store_data, glow_data, faction_data, tab):
                 'color': f"rgba({blue}, {blue_layers[0]['opacity']})" if glow else "rgba(255, 255, 255, 1)",
                 'thickness': blue_layers[0]['bar_thickness'] if glow else 0.15
             },
-            'bgcolor': f"{black}",
+            'bgcolor': "rgba(0, 0, 0, 0)",
             'steps': [
                 {'range': [-1, 0], 'color': color_maps[tab][1]},
                 {'range': [0, 1], 'color': color_maps[tab][0]}
@@ -894,7 +990,8 @@ def update_graphs(store_data, glow_data, faction_data, tab):
                 'thickness': blue_layers[0]['threshold_thickness'] if glow else 0.565,
                 'value': mag
             }
-        }
+        },
+        domain={'x': [0, 1], 'y': [0.35, 1]},
     ))
 
 
@@ -916,7 +1013,7 @@ def update_graphs(store_data, glow_data, faction_data, tab):
                         'value': mag
                     }
                 },
-                domain={'x': [0, 1], 'y': [0, 1]},
+                domain={'x': [0, 1], 'y': [0.35, 1]},
             ))
 
         fig_gauge.add_trace(go.Indicator(
@@ -934,17 +1031,17 @@ def update_graphs(store_data, glow_data, faction_data, tab):
                     'value': mag
                 }
             },
-            domain={'x': [0, 1], 'y': [0, 1]},
+            domain={'x': [0, 1], 'y': [0.35, 1]},
         ))
 
 
 
     fig_gauge.update_layout(
-        paper_bgcolor=f"{black}",
+        paper_bgcolor="rgba(0, 0, 0, 0)",
         font=dict(color=f"{white}", family="Inter, sans-serif", size=12),
         height=280,
         width=280,
-        margin=dict(t=30, b=20, l=20, r=20)
+        margin=dict(t=0, b=0, l=20, r=20)
     )
     
     agreement_score = models[tab].get_agreement_score()
@@ -1014,9 +1111,9 @@ def update_graphs(store_data, glow_data, faction_data, tab):
     )
 
     fig_agree.update_layout(
-        title=dict(text=agreement_title, font=dict(color=f"{white}"), x=0.5),
-        paper_bgcolor=f'{black}',
-        plot_bgcolor=f'{black}',
+        # title=dict(text=agreement_title, font=dict(color=f"{white}"), x=0.5),
+        paper_bgcolor='rgba(0, 0, 0, 0)',
+        plot_bgcolor='rgba(0, 0, 0, 0)',
         font=dict(color=f"{white}", family="Inter, sans-serif", size=12),
         height=120,
         margin=dict(l=20, r=20, t=40, b=10),
@@ -1166,9 +1263,8 @@ def update_graphs(store_data, glow_data, faction_data, tab):
 
 
     fig_energy.update_layout(
-        margin=dict(t=50, b=20, l=20, r=20),
-        title=dict(text="Energy Over Time", y=0.95),
-        paper_bgcolor=f'{black}', plot_bgcolor=f'{black}',
+        margin=dict(t=45, b=20, l=20, r=20),
+        paper_bgcolor='rgba(0, 0, 0, 0)', plot_bgcolor='rgba(0, 0, 0, 0)',
         showlegend=False,
         font=dict(color=f"{white}", family="Inter, sans-serif", size=12),
         xaxis_showgrid=False,
@@ -1195,7 +1291,6 @@ def update_graphs(store_data, glow_data, faction_data, tab):
     )
     fig_distribution.update_layout(
         margin=dict(t=60, b=20, l=20, r=20),
-        title=dict(text=spin_title, y=0.95),
         xaxis=dict(tickmode='linear', dtick=1),
         xaxis_title=None,
         yaxis=dict(
@@ -1204,8 +1299,8 @@ def update_graphs(store_data, glow_data, faction_data, tab):
             tickvals=[100, 50, 0, -50, -100],
         ),
         yaxis_title=None,
-        paper_bgcolor=f'{black}',
-        plot_bgcolor=f'{black}',
+        paper_bgcolor='rgba(0, 0, 0, 0)',
+        plot_bgcolor='rgba(0, 0, 0, 0)',
         font=dict(color=f"{white}", family="Inter, sans-serif", size=12),
     )
 

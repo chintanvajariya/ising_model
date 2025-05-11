@@ -151,35 +151,21 @@ class IsingSim:
         self.energies = list(snap['energies'])
         self.h_map = snap['h_map'].copy()
 
-    def inject_event(self, value):
-        N = self.N
-        new_lattice = self.lattice.copy()
-        beta = 2
+    def inject_event(self, event_strength):
+        beta = 0.25
 
-        for r in range(N):
-            for c in range(N):
-                spin = self.lattice[r, c]
-                group = self.faction_map[r, c]
-                h = self.h_map[group]
+        desired_spin = np.sign(event_strength)
+        lattice = self.lattice
 
-                align_push = value * h * (-spin)
-                h_eff = value
-                local_field = h_eff + self.h_map
-                aligned = self.lattice * local_field
+        misaligned_mask = lattice != desired_spin
 
-                prob_flip = 1 / (1 + np.exp(aligned * beta))  # sigmoid-based flip prob
+        prob_flip = np.abs(event_strength) * beta
+        rand_vals = np.random.rand(*lattice.shape)
+        flip_mask = (rand_vals < prob_flip) & misaligned_mask
 
-                rand_vals = np.random.rand(*self.lattice.shape)
-                flip_mask = rand_vals < prob_flip
-                self.lattice[flip_mask] *= -1
-
-
-                rand_vals = np.random.rand(*prob_flip.shape)
-                flip_mask = rand_vals < prob_flip
-                self.lattice[flip_mask] *= -1
-
-        self.lattice = new_lattice
+        self.lattice[flip_mask] *= -1
         self.current_trial += 1
+
 
     def adjust_constants(self, faction_id=None, new_J_intra=None, new_J_inter=None, new_T=None, new_h=None):
         if new_J_intra is not None:
