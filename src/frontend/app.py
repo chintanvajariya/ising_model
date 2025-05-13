@@ -1,8 +1,8 @@
 import dash
-from src.backend import IsingSim
-from src.frontend.layout import create_app_layout
-from src.frontend.callbacks import register_callbacks
-from src.frontend.helpers import compute_faction_borders, compute_faction_labels
+from backend import IsingSim
+from frontend.layout import create_app_layout
+from frontend.callbacks import register_callbacks
+from frontend.helpers import compute_faction_borders, compute_faction_labels
 
 app = dash.Dash(
     __name__,

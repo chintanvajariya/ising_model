@@ -4,7 +4,7 @@ from dash import Input, Output, State, callback_context, ALL
 import plotly.graph_objects as go
 import plotly.express as px
 
-from src.backend import inject_event
+from backend import inject_event
 from .constants import color_maps, character_maps, glow_layers, blue, white, black, agreement_titles, event_mapping, scale_val
 from .helpers import button_style, inject_button_style
 from .layout import generate_model_layout
